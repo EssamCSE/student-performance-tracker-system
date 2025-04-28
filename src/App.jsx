@@ -9,7 +9,8 @@ import Auth from './pages/Auth'
 
 function ProtectedRoute({ children }) {
   const user = JSON.parse(localStorage.getItem('user'))
-  if (!user) {
+  const token = localStorage.getItem('token')
+  if (!user || !token) {
     return <Navigate to="/auth" replace />
   }
   return children

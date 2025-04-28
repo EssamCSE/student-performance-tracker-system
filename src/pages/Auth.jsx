@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { loginUser, registerUser } from '@/api/auth'
 
 export default function Auth() {
   const navigate = useNavigate()
@@ -20,19 +21,26 @@ export default function Auth() {
     setError('')
 
     try {
-      // TODO: Implement actual authentication
-      // For now, just simulate login/register
+      let data;
       if (isLogin) {
-        // Simulate login
-        localStorage.setItem('user', JSON.stringify({ ...formData }))
-        navigate('/dashboard')
+        data = await loginUser(formData);
       } else {
-        // Simulate registration
-        localStorage.setItem('user', JSON.stringify({ ...formData }))
-        navigate('/dashboard')
+        data = await registerUser(formData);
       }
+      
+      const userData = data.user;
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', data.token);
+      navigate('/dashboard');
+      
     } catch (err) {
-      setError(err.message || 'An error occurred')
+      setError(err.message || 'An error occurred');
+      {error && ( // if error is not empty
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription> 
+        </Alert>
+      )}      
+      console.error('Auth error:', err);
     }
   }
 
