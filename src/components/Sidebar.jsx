@@ -21,7 +21,7 @@ export function AppSidebar() {
       </div>
 
       {/* Static sidebar on md+ */}
-      <SidebarInset className="hidden md:flex md:flex-col w-64 h-screen border-r bg-background">
+      <SidebarInset className="hidden md:flex md:flex-col w-64 h-screen border-r bg-background fixed left-0 top-0">
         <div className="px-4 py-6 text-2xl font-bold">My Dashboard</div>
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           {/* Dashboard link */}
@@ -29,8 +29,8 @@ export function AppSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start ${
-                pathname === '/dashboard' ? 'bg-muted text-muted-foreground' : ''
+              className={`w-full justify-start hover:bg-muted/50 ${
+                pathname === '/dashboard' ? 'bg-muted hover:bg-muted text-primary font-medium' : ''
               }`}
             >
               <HomeIcon className="mr-2 h-4 w-4" />
@@ -48,8 +48,8 @@ export function AppSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start ${
-                pathname === '/students/list' ? 'bg-muted text-muted-foreground' : ''
+              className={`w-full justify-start hover:bg-muted/50 ${
+                pathname === '/students/list' ? 'bg-muted hover:bg-muted text-primary font-medium' : ''
               }`}
             >
               <UsersIcon className="mr-2 h-4 w-4" />
@@ -60,9 +60,9 @@ export function AppSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start ${
+              className={`w-full justify-start hover:bg-muted/50 ${
                 pathname === '/students/attendance'
-                  ? 'bg-muted text-muted-foreground'
+                  ? 'bg-muted hover:bg-muted text-primary font-medium'
                   : ''
               }`}
             >
@@ -74,8 +74,8 @@ export function AppSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start ${
-                pathname === '/students/marks' ? 'bg-muted text-muted-foreground' : ''
+              className={`w-full justify-start hover:bg-muted/50 ${
+                pathname === '/students/marks' ? 'bg-muted hover:bg-muted text-primary font-medium' : ''
               }`}
             >
               <ClipboardListIcon className="mr-2 h-4 w-4" />
