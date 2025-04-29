@@ -35,7 +35,10 @@ export const getAllMarks = async () => {
 export const updateMarks = async (studentId, marksData) => {
   try {
     const token = localStorage.getItem('token');
-    const response = await axios.put(`${API_URL}/marks/${studentId}`, marksData, {
+    const response = await axios.post(`${API_URL}/marks`, {
+      ...marksData,
+      student_id: studentId
+    }, {
       headers: {
         Authorization: `Bearer ${token}`
       }

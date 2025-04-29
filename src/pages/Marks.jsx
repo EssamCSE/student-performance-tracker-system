@@ -30,6 +30,7 @@ export default function Marks() {
             name: student.name,
             quiz1: studentMarks.quiz1 || 0,
             quiz2: studentMarks.quiz2 || 0,
+            quiz3: studentMarks.quiz3 || 0,
             midExam: studentMarks.midExam || 0,
             finalExam: studentMarks.finalExam || 0,
             assignment1: studentMarks.assignment1 || 0,
@@ -51,21 +52,29 @@ export default function Marks() {
   const handleSave = async () => {
     try {
       setLoading(true)
-      for (const student of students) {
-        const marksData = {
-          student_id: student.id,
-          quiz1: student.quiz1,
-          quiz2: student.quiz2,
-          quiz3: student.quiz3,
-          midExam: student.midExam,
-          finalExam: student.finalExam,
-          assignment1: student.assignment1,
-          assignment2: student.assignment2
-        }
-        await updateMarks(student.id, marksData)
-      }
+      setError('')
+      
+      const results = await Promise.all(
+        students.map(async (student) => {
+          const marksData = {
+            student_id: student.id,
+            quiz1: student.quiz1 || null,
+            quiz2: student.quiz2 || null,
+            quiz3: student.quiz3 || null,
+            midExam: student.midExam || null,
+            finalExam: student.finalExam || null,
+            assignment1: student.assignment1 || null,
+            assignment2: student.assignment2 || null
+          }
+          return await updateMarks(student.id, marksData)
+        })
+      )
+      
+      // Show success message if all updates succeeded
+      setError('Marks saved successfully!')
     } catch (err) {
-      setError(err.message || 'Failed to save marks')
+      console.error('Save error:', err)
+      setError(err.response?.data?.error || err.message || 'Failed to save marks')
     } finally {
       setLoading(false)
     }

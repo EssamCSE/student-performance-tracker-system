@@ -128,71 +128,7 @@ app.get('/api/students', authenticateToken, async (req, res) => {
   }
 });
 
-// GET all marks
-app.get('/api/marks', authenticateToken, async (req, res) => {
-  try {
-    const [marks] = await pool.execute('SELECT * FROM marks');
-    res.json(marks);
-  } catch (err) {
-    console.error('Error fetching marks:', err);
-    res.status(500).json({ error: 'Failed to fetch marks' });
-  }
-});
 
-// GET marks for specific student
-app.get('/api/marks/:studentId', authenticateToken, async (req, res) => {
-  try {
-    const [marks] = await pool.execute('SELECT * FROM marks WHERE student_id = ?', [req.params.studentId]);
-    res.json(marks);
-  } catch (err) {
-    console.error('Error fetching student marks:', err);
-    res.status(500).json({ error: 'Failed to fetch student marks' });
-  }
-});
-
-// POST new marks
-app.post('/api/marks', authenticateToken, async (req, res) => {
-  try {
-    const { student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2 } = req.body;
-    
-    const [result] = await pool.execute(
-      'INSERT INTO marks (student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2]
-    );
-    res.status(201).json({ message: 'Marks added successfully', id: result.insertId });
-  } catch (err) {
-    console.error('Error adding marks:', err);
-    res.status(500).json({ error: 'Failed to add marks' });
-  }
-});
-
-// PUT update marks
-app.put('/api/marks/:studentId', authenticateToken, async (req, res) => {
-  try {
-    const { quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2 } = req.body;
-    
-    // Convert undefined values to null for database
-    const dbValues = [
-      quiz1 === undefined ? null : quiz1,
-      quiz2 === undefined ? null : quiz2,
-      quiz3 === undefined ? null : quiz3,
-      midExam === undefined ? null : midExam,
-      finalExam === undefined ? null : finalExam,
-      assignment1 === undefined ? null : assignment1,
-      assignment2 === undefined ? null : assignment2,
-      req.params.studentId
-    ];
-    
-    await pool.execute(
-      'UPDATE marks SET quiz1 = ?, quiz2 = ?, quiz3 = ?, midExam = ?, finalExam = ?, assignment1 = ?, assignment2 = ? WHERE student_id = ?',
-      dbValues
-    );
-    res.json({ message: 'Marks updated successfully' });
-  } catch (err) {
-    console.error('Error updating marks:', err);
-    res.status(500).json({ error: 'Failed to update marks' });
-  }
-});
 
 // POST new student
 app.post('/api/students', authenticateToken, async (req, res) => {
@@ -292,6 +228,7 @@ app.get('/api/marks/:studentId', authenticateToken, async (req, res) => {
 // POST create/update marks
 app.post('/api/marks', authenticateToken, async (req, res) => {
   const marksData = req.body;
+  
   try {
     // Check if marks exist for this student
     const [existing] = await pool.execute('SELECT * FROM marks WHERE student_id = ?', [marksData.student_id]);
@@ -301,13 +238,13 @@ app.post('/api/marks', authenticateToken, async (req, res) => {
       await pool.execute(
         'UPDATE marks SET quiz1=?, quiz2=?, quiz3=?, midExam=?, finalExam=?, assignment1=?, assignment2=? WHERE student_id=?',
         [
-          marksData.quiz1,
-          marksData.quiz2,
-          marksData.quiz3,
-          marksData.midExam,
-          marksData.finalExam,
-          marksData.assignment1,
-          marksData.assignment2,
+          marksData.quiz1 || null,
+          marksData.quiz2 || null,
+          marksData.quiz3 || null,
+          marksData.midExam || null,
+          marksData.finalExam || null,
+          marksData.assignment1 || null,
+          marksData.assignment2 || null,
           marksData.student_id
         ]
       );
@@ -317,13 +254,13 @@ app.post('/api/marks', authenticateToken, async (req, res) => {
         'INSERT INTO marks (student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           marksData.student_id,
-          marksData.quiz1,
-          marksData.quiz2,
-          marksData.quiz3,
-          marksData.midExam,
-          marksData.finalExam,
-          marksData.assignment1,
-          marksData.assignment2
+          marksData.quiz1 || null,
+          marksData.quiz2 || null,
+          marksData.quiz3 || null,
+          marksData.midExam || null,
+          marksData.finalExam || null,
+          marksData.assignment1 || null,
+          marksData.assignment2 || null
         ]
       );
     }
@@ -331,7 +268,10 @@ app.post('/api/marks', authenticateToken, async (req, res) => {
     res.json({ message: 'Marks saved successfully' });
   } catch (err) {
     console.error('Error saving marks:', err);
-    res.status(500).json({ error: 'Failed to save marks' });
+    res.status(500).json({ 
+      error: 'Failed to save marks', 
+      details: err.message 
+    });
   }
 });
 
