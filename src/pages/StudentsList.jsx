@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { addStudent, getStudents, updateStudent, deleteStudent } from '@/api/students'
 import {
@@ -109,7 +111,15 @@ export default function StudentsList() {
         phone: ''
       })
       setDialogOpen(false)
+      toast.success('Student added successfully!', {
+        position: 'top-center',
+        duration: 3000
+      })
     } catch (err) {
+      toast.error(err.message || 'Failed to add student', {
+        position: 'top-center',
+        duration: 3000
+      })
       setError(err.message || 'Failed to add student')
     }
   }
@@ -155,7 +165,15 @@ export default function StudentsList() {
       await updateStudent(editingStudent.id, editingStudent)
       await fetchStudents()
       setEditDialogOpen(false)
+      toast.success('Student updated successfully!', {
+        position: 'top-center',
+        duration: 3000
+      })
     } catch (err) {
+      toast.error(err.message || 'Failed to update student', {
+        position: 'top-center',
+        duration: 3000
+      })
       setError(err.message || 'Failed to update student')
     }
   }
@@ -164,13 +182,22 @@ export default function StudentsList() {
     try {
       await deleteStudent(id)
       await fetchStudents()
+      toast.success('Student deleted successfully!', {
+        position: 'top-center',
+        duration: 3000
+      })
     } catch (err) {
+      toast.error(err.message || 'Failed to delete student', {
+        position: 'top-center',
+        duration: 3000
+      })
       setError(err.message || 'Failed to delete student')
     }
   }
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-center" />
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Students List</h2>
         <Dialog>

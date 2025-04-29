@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import {
   Table,
   TableBody,
@@ -16,6 +18,8 @@ export default function Marks() {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [programSearchTerm, setProgramSearchTerm] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,7 +49,6 @@ export default function Marks() {
         setLoading(false)
       }
     }
-    
     fetchData()
     
     // Add event listener for page refresh
@@ -79,9 +82,17 @@ export default function Marks() {
       )
       
       // Show success message if all updates succeeded
+      toast.success('Marks saved successfully!', {
+        position: 'top-center',
+        duration: 3000
+      })
       setError('Marks saved successfully!')
     } catch (err) {
       console.error('Save error:', err)
+      toast.error(err.response?.data?.error || err.message || 'Failed to save marks', {
+        position: 'top-center',
+        duration: 3000
+      })
       setError(err.response?.data?.error || err.message || 'Failed to save marks')
     } finally {
       setLoading(false)
@@ -152,11 +163,22 @@ export default function Marks() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-center" />
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Marks</h2>
         <Button onClick={handleSave} disabled={loading}>
-  {loading ? 'Saving...' : 'Save Changes'}
-</Button>
+          {loading ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
+      
+      <div className="flex gap-4">
+      <Input
+          placeholder="Search by name or ID..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+
       </div>
 
       <div className="rounded-md border overflow-x-auto">
@@ -165,20 +187,25 @@ export default function Marks() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead className="text-center">Quiz 1</TableHead>
-              <TableHead className="text-center">Quiz 2</TableHead>
-              <TableHead className="text-center">Quiz 3</TableHead>
-              <TableHead className="text-center">Midterm</TableHead>
-              <TableHead className="text-center">Final</TableHead>
-              <TableHead className="text-center">Assign 1</TableHead>
-              <TableHead className="text-center">Assign 2</TableHead>
-              <TableHead className="text-center">Total</TableHead>
-              <TableHead className="text-center">Percentage</TableHead>
-              <TableHead className="text-center">Grade</TableHead>
+              <TableHead className="pl-7">Quiz 1</TableHead>
+              <TableHead className="pl-7">Quiz 2</TableHead>
+              <TableHead className="pl-7">Quiz 3</TableHead>
+              <TableHead className="pl-2">Midterm Exam</TableHead>
+              <TableHead className="pl-3">Final Exam</TableHead>
+              <TableHead className="pl-2">Assignment 1</TableHead>
+              <TableHead className="pl-2">Assignment 2</TableHead>
+              <TableHead className="pl-7">Total</TableHead>
+              <TableHead className="pl-7">Percentage</TableHead>
+              <TableHead className="pl-7">Grade</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {students.map((student) => {
+            {students
+      .filter((student) =>
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.id.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .map((student) => {
               const { totalMarks, percentage, grade } = calculateTotal(student)
               return (
                 <TableRow key={student.id}>
