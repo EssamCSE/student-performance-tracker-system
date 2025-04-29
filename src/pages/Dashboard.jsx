@@ -1,76 +1,111 @@
-import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState, useEffect } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, RadialBarChart, RadialBar
+} from 'recharts';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { getDashboardStats } from '@/api/dashboard';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export default function Dashboard() {
-  // Example statistics - these would come from your backend
-  const stats = {
-    totalStudents: 150,
-    averageAttendance: 85,
-    averageMarks: 78,
-    atRiskStudents: 12,
-    newEnrollments: 8
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getDashboardStats()
+      .then(data => setStats(data))
+      .catch(err => {
+        console.error(err);
+        setError('Unable to load dashboard data');
+      });
+  }, []);
+
+  if (error) {
+    return <div className="p-6 text-red-600">Error: {error}</div>;
+  }
+  if (!stats) {
+    return <div className="p-6">Loading…</div>;
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Student Management Dashboard</h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Total Students */}
+      {/* Top Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { title: 'Total Students', value: stats.totalStudents, caption: 'Enrolled' },
+          { title: 'Avg Attendance', value: `${stats.avgAttendance}%`, caption: 'This month' },
+          { title: 'Excellent Students', value: stats.excellentStudents, caption: '≥90% marks & attendance' },
+          { title: '—', value: '', caption: '' }
+        ].map((c, i) => (
+          <Card key={i}>
+            <CardHeader><CardTitle>{c.title}</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold">{c.value}</p>
+              {c.caption && <p className="text-sm text-gray-500">{c.caption}</p>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Distribution & Top 5 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Attendance Distribution</CardTitle></CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">Currently enrolled</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={stats.attendanceDistribution}
+                  cx="50%" cy="50%" outerRadius={80}
+                  dataKey="value" label
+                >
+                  {stats.attendanceDistribution.map((_, idx) => (
+                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Average Attendance */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Attendance</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Top Performing Students</CardTitle></CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.averageAttendance}%</div>
-            <p className="text-xs text-muted-foreground">Across all students</p>
-          </CardContent>
-        </Card>
-
-        {/* Average Marks */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Marks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.averageMarks}%</div>
-            <p className="text-xs text-muted-foreground">Overall performance</p>
-          </CardContent>
-        </Card>
-
-        {/* At-Risk Students */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">At-Risk Students</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.atRiskStudents}</div>
-            <p className="text-xs text-muted-foreground">Below threshold</p>
-          </CardContent>
-        </Card>
-
-        {/* New Enrollments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Enrollments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.newEnrollments}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                layout="vertical" data={stats.topStudents}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" domain={[0, 100]} />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Bar dataKey="marks" fill="#8884d8" name="Avg Marks" />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Trend */}
+      <Card>
+        <CardHeader><CardTitle>Monthly Attendance Trend</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={stats.monthlyTrend}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Line type="monotone" dataKey="attendance" stroke="#8884d8" />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }
