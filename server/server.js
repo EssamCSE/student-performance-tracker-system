@@ -370,7 +370,10 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     const monthlyTrend = Array.from({ length: daysInMonth }, (_, i) => {
       const d = i + 1;
       const date = `${monthStr}-${String(d).padStart(2, '0')}`;
-      const dayRec = attendance.filter(a => a.date === date);
+      const dayRec = attendance.filter(a => {
+        const recordDate = new Date(a.date).toISOString().slice(0, 10);
+        return recordDate === date;
+      });
       const presentCount = dayRec.filter(a => a.status === 1).length;
       const pct = dayRec.length ? (presentCount / dayRec.length) * 100 : 0;
       return { date: String(d), attendance: +pct.toFixed(1) };

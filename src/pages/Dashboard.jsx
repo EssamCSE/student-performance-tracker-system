@@ -35,6 +35,12 @@ export default function Dashboard() {
     return <div className="p-6">Loading…</div>;
   }
 
+  // Transform monthly trend data to use proper date format
+  const transformedMonthlyTrend = stats.monthlyTrend.map(item => ({
+    date: `Day ${item.date}`,
+    attendance: item.attendance
+  }));
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Student Management Dashboard</h1>
@@ -103,7 +109,7 @@ export default function Dashboard() {
         <CardHeader><CardTitle>Monthly Attendance Trend</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={stats.monthlyTrend}>
+            <LineChart data={transformedMonthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis domain={[0, 100]} />
