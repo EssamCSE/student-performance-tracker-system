@@ -47,6 +47,14 @@ export default function Marks() {
     }
     
     fetchData()
+    
+    // Add event listener for page refresh
+    window.addEventListener('beforeunload', fetchData);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('beforeunload', fetchData);
+    };
   }, [])
 
   const handleSave = async () => {
@@ -123,8 +131,21 @@ export default function Marks() {
       assignment1 = 0,
       assignment2 = 0
     } = student
-    const totalMarks = quiz1 + quiz2 + quiz3 + midExam + finalExam + assignment1 + assignment2
-    const percentage = totalMarks / 7 // Because there are 7 items
+    
+    // Calculate total marks with proper rounding for each component
+    const totalMarks = Math.round(
+      Number(quiz1) + 
+      Number(quiz2) + 
+      Number(quiz3) + 
+      Number(midExam) + 
+      Number(finalExam) + 
+      Number(assignment1) + 
+      Number(assignment2)
+    )
+    
+    // Calculate percentage with proper handling of division
+    const maxPossible = 7 * 100 // Assuming each component is out of 100
+    const percentage = maxPossible > 0 ? (totalMarks / maxPossible) * 100 : 0
     const grade = getGrade(percentage)
     return { totalMarks, percentage, grade }
   }
@@ -167,7 +188,7 @@ export default function Marks() {
                     <TableCell key={field} className="text-center">
                       <Input
                         type="number"
-                        value={student[field]}
+                        value={student[field] ? Math.round(student[field]) : ''}
                         onChange={(e) =>
                           handleInputChange(student.id, field, e.target.value)
                         }
