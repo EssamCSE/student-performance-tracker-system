@@ -14,9 +14,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     getDashboardStats()
-      .then(data => setStats(data))
+      .then(data => {
+        if (!data || Object.keys(data).length === 0) {
+          console.error('Empty or invalid dashboard data:', data);
+          setError('Received empty dashboard data');
+        } else {
+          setStats(data);
+        }
+      })
       .catch(err => {
-        console.error(err);
+        console.error('Dashboard API error:', err.response?.data || err.message || err);
         setError('Unable to load dashboard data');
       });
   }, []);
@@ -84,7 +91,7 @@ export default function Dashboard() {
                 <XAxis type="number" domain={[0, 100]} />
                 <YAxis dataKey="name" type="category" width={100} />
                 <Tooltip />
-                <Bar dataKey="marks" fill="#8884d8" name="Avg Marks" />
+                <Bar dataKey="marks" fill="#4CAF50" name="Avg Marks" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -101,7 +108,7 @@ export default function Dashboard() {
               <XAxis dataKey="date" />
               <YAxis domain={[0, 100]} />
               <Tooltip />
-              <Line type="monotone" dataKey="attendance" stroke="#8884d8" />
+              <Line type="monotone" dataKey="attendance" stroke="#4CAF50" strokeWidth={2} dot={{ fill: '#4CAF50', strokeWidth: 2 }} activeDot={{ r: 8, fill: '#4CAF50' }} />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

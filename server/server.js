@@ -293,115 +293,6 @@ app.post('/api/marks', authenticateToken, async (req, res) => {
   }
 });
 
-// // ----------------- Dashboard Endpoints -----------------
-// // GET dashboard statistics
-// app.get('/api/dashboard', authenticateToken, async (req, res) => {
-//   try {
-//     const monthStr = new Date().toISOString().slice(0, 7);
-    
-//     // Get all data in parallel
-//     const [students, attendance, marks] = await Promise.all([
-//       pool.execute('SELECT id, name FROM students'),
-//       pool.execute(`SELECT student_id, date, status FROM attendance WHERE DATE_FORMAT(date, '%Y-%m') = ?`, [monthStr]),
-//       pool.execute('SELECT * FROM marks')
-//     ]);
-    
-//     // Process students
-//     const studentList = students[0];
-//     const totalStudents = studentList.length;
-    
-//     // Process attendance
-//     const attendanceByStudent = {};
-//     attendance[0].forEach(record => {
-//       const sid = record.student_id;
-//       if (!attendanceByStudent[sid]) {
-//         attendanceByStudent[sid] = { present: 0, total: 0 };
-//       }
-//       attendanceByStudent[sid].total++;
-//       if (record.status === 1) {
-//         attendanceByStudent[sid].present++;
-//       }
-//     });
-    
-//     const attendancePercentages = Object.values(attendanceByStudent).map(
-//       ({ present, total }) => total > 0 ? (present / total) * 100 : 0
-//     );
-    
-//     const avgAttendance = attendancePercentages.length
-//       ? attendancePercentages.reduce((a, b) => a + b, 0) / attendancePercentages.length
-//       : 0;
-    
-//     // Attendance distribution
-//     const distribution = [
-//       { name: 'Good (≥85%)', value: 0 },
-//       { name: 'Warning (75–84%)', value: 0 },
-//       { name: 'At Risk (<75%)', value: 0 }
-//     ];
-    
-//     attendancePercentages.forEach(pct => {
-//       if (pct >= 85) distribution[0].value++;
-//       else if (pct >= 75) distribution[1].value++;
-//       else distribution[2].value++;
-//     });
-    
-//     // Process marks
-//     const studentMarks = marks[0].map(m => ({
-//       student_id: m.student_id,
-//       avgMark: [
-//         m.quiz1, m.quiz2, m.quiz3,
-//         m.midExam, m.finalExam,
-//         m.assignment1, m.assignment2
-//       ].reduce((sum, x) => sum + (x || 0), 0) / 7
-//     }));
-    
-//     // Top performing students
-//     const topStudents = studentMarks
-//       .sort((a, b) => b.avgMark - a.avgMark)
-//       .slice(0, 5)
-//       .map(({ student_id, avgMark }) => ({
-//         name: studentList.find(s => s.id === student_id)?.name || `#${student_id}`,
-//         marks: +avgMark.toFixed(1)
-//       }));
-    
-//     // Excellent students (≥90% marks & attendance)
-//     const excellentStudents = studentMarks.filter(({ student_id, avgMark }) => {
-//       const idx = studentList.findIndex(s => s.id === student_id);
-//       const attPct = attendancePercentages[idx] || 0;
-//       return avgMark >= 90 && attPct >= 90;
-//     }).length;
-    
-//     // Monthly attendance trend
-//     const daysInMonth = new Date().getDate();
-//     const monthlyTrend = Array.from({ length: daysInMonth }, (_, i) => {
-//       const day = i + 1;
-//       const date = `${monthStr}-${String(day).padStart(2, '0')}`;
-//       const dayRec = attendance[0].filter(a => a.date === date);
-//       const presentCount = dayRec.filter(a => a.status === 1).length;
-//       const pct = dayRec.length ? (presentCount / dayRec.length) * 100 : 0;
-//       return { date: String(day), attendance: +pct.toFixed(1) };
-//     });
-    
-//     res.json({
-//       totalStudents,
-//       avgAttendance: +avgAttendance.toFixed(1),
-//       attendanceDistribution: distribution,
-//       topStudents,
-//       excellentStudents,
-//       monthlyTrend
-//     });
-//   } catch (err) {
-//     console.error('Dashboard error:', err);
-//     res.status(500).json({ error: 'Failed to load dashboard data' });
-//   }
-// });
-
-// // ----------------- Start Server -----------------
-// app.listen(port, () => {
-//   console.log(`Server running at http://localhost:${port}`);
-// });
-
-
-
 // ----------------- Dashboard Endpoint -----------------
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
   try {
@@ -454,10 +345,10 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     const studentMarks = marks.map(m => ({
       student_id: m.student_id,
       avgMark: (
-        (m.quiz1||0) + (m.quiz2||0) + (m.quiz3||0) +
-        (m.midExam||0) + (m.finalExam||0) +
-        (m.assignment1||0) + (m.assignment2||0)
-      ) / 7
+        ((m.quiz1||0)/20)*5 + ((m.quiz2||0)/20)*5 + ((m.quiz3||0)/20)*5 +
+        ((m.midExam||0)/100)*30 + ((m.finalExam||0)/200)*40 +
+        ((m.assignment1||0)/20)*7.5 + ((m.assignment2||0)/20)*7.5
+      )
     }));
     const topStudents = studentMarks
       .sort((a, b) => b.avgMark - a.avgMark)
