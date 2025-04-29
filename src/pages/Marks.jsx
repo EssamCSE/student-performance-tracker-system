@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -9,43 +9,67 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
+import { getAllMarks, getStudentMarks, updateMarks } from '@/api/marks'
+import { getStudents } from '@/api/students'
 
 export default function Marks() {
-  const [students, setStudents] = useState([
-    {
-      id: 'STU001',
-      name: 'Alice Johnson',
-      quiz1: 85,
-      quiz2: 90,
-      quiz3: 88,
-      midExam: 78,
-      finalExam: 85,
-      assignment1: 92,
-      assignment2: 88
-    },
-    {
-      id: 'STU002',
-      name: 'Bob Smith',
-      quiz1: 75,
-      quiz2: 70,
-      quiz3: 68,
-      midExam: 72,
-      finalExam: 75,
-      assignment1: 82,
-      assignment2: 78
-    },
-    {
-      id: 'STU003',
-      name: 'Carol White',
-      quiz1: 95,
-      quiz2: 92,
-      quiz3: 94,
-      midExam: 88,
-      finalExam: 92,
-      assignment1: 95,
-      assignment2: 90
+  const [students, setStudents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const studentsData = await getStudents()
+        const marksData = await getAllMarks()
+        
+        const mergedData = studentsData.map(student => {
+          const studentMarks = marksData.find(m => m.student_id === student.id) || {}
+          return {
+            id: student.id,
+            name: student.name,
+            quiz1: studentMarks.quiz1 || 0,
+            quiz2: studentMarks.quiz2 || 0,
+            midExam: studentMarks.midExam || 0,
+            finalExam: studentMarks.finalExam || 0,
+            assignment1: studentMarks.assignment1 || 0,
+            assignment2: studentMarks.assignment2 || 0
+          }
+        })
+        
+        setStudents(mergedData)
+      } catch (err) {
+        setError(err.message || 'Failed to fetch data')
+      } finally {
+        setLoading(false)
+      }
     }
-  ])
+    
+    fetchData()
+  }, [])
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+      for (const student of students) {
+        const marksData = {
+          student_id: student.id,
+          quiz1: student.quiz1,
+          quiz2: student.quiz2,
+          quiz3: student.quiz3,
+          midExam: student.midExam,
+          finalExam: student.finalExam,
+          assignment1: student.assignment1,
+          assignment2: student.assignment2
+        }
+        await updateMarks(student.id, marksData)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to save marks')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getGrade = (percentage) => {
     if (percentage >= 90) return 'A'
@@ -100,7 +124,9 @@ export default function Marks() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Marks</h2>
-        <Button>Save Changes</Button>
+        <Button onClick={handleSave} disabled={loading}>
+  {loading ? 'Saving...' : 'Save Changes'}
+</Button>
       </div>
 
       <div className="rounded-md border overflow-x-auto">
