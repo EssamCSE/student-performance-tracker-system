@@ -11,11 +11,28 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
-// POST request for user registration
+// ----------------- Authentication Middleware -----------------
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid token.' });
+  }
+};
+
+// ----------------- User Registration -----------------
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
   try {
-    // Check if user already exists
     const [existingUsers] = await pool.execute(
       'SELECT * FROM users WHERE email = ?',
       [email]
@@ -25,17 +42,14 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Insert new user
     const [result] = await pool.execute(
       'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
       [name, email, hashedPassword]
     );
 
-    // Create and sign JWT
     const token = jwt.sign(
       { userId: result.insertId, email },
       config.jwtSecret,
@@ -56,11 +70,10 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// POST request for user login
+// ----------------- User Login -----------------
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    // Get user from database
     const [users] = await pool.execute(
       'SELECT * FROM users WHERE email = ?',
       [email]
@@ -71,14 +84,11 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = users[0];
-
-    // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Create and sign JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwtSecret,
@@ -99,24 +109,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, config.jwtSecret);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    res.status(400).json({ error: 'Invalid token.' });
-  }
-};
-
+// ----------------- Student Endpoints -----------------
 // GET all students
 app.get('/api/students', authenticateToken, async (req, res) => {
   try {
@@ -128,31 +121,29 @@ app.get('/api/students', authenticateToken, async (req, res) => {
   }
 });
 
-
-
 // POST new student
 app.post('/api/students', authenticateToken, async (req, res) => {
   const { id, name, program, year, email, phone } = req.body;
-
-  // Validate required fields
   if (!id || !name || !program || !year || !email || !phone) {
     return res.status(400).json({ error: 'All fields are required' });
   }
-
   try {
-    // Check if student ID already exists
-    const [existingStudent] = await pool.execute('SELECT id FROM students WHERE id = ?', [id]);
+    const [existingStudent] = await pool.execute(
+      'SELECT id FROM students WHERE id = ?',
+      [id]
+    );
     if (existingStudent.length > 0) {
       return res.status(400).json({ error: 'Student ID already exists' });
     }
 
-    // Check if email already exists
-    const [existingEmail] = await pool.execute('SELECT email FROM students WHERE email = ?', [email]);
+    const [existingEmail] = await pool.execute(
+      'SELECT email FROM students WHERE email = ?',
+      [email]
+    );
     if (existingEmail.length > 0) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Convert year to integer
     const yearInt = parseInt(year, 10);
     if (isNaN(yearInt)) {
       return res.status(400).json({ error: 'Year must be a valid number' });
@@ -170,7 +161,6 @@ app.post('/api/students', authenticateToken, async (req, res) => {
     } else {
       res.status(500).json({ error: 'Failed to add student. Please try again.' });
     }
-
   }
 });
 
@@ -195,13 +185,67 @@ app.delete('/api/students/:id', authenticateToken, async (req, res) => {
   const studentId = req.params.id;
   try {
     await pool.execute('DELETE FROM students WHERE id = ?', [studentId]);
-    res.json({ message: 'Student deleted successfully' });
+    return res.json({ message: 'Student deleted successfully' });
   } catch (err) {
     console.error('Error deleting student:', err);
-    res.status(500).json({ error: 'Failed to delete student' });
+    return res.status(500).json({ error: 'Failed to delete student' });
   }
 });
 
+// ----------------- Attendance Endpoints -----------------
+// GET attendance for a month
+app.get('/api/attendance/:month', authenticateToken, async (req, res) => {
+  const month = req.params.month;
+  try {
+    const [attendance] = await pool.execute(
+      `SELECT student_id, date, status FROM attendance WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
+      [month]
+    );
+    res.json(attendance);
+  } catch (err) {
+    console.error('Error fetching attendance:', err);
+    res.status(500).json({ error: 'Failed to fetch attendance data' });
+  }
+});
+
+// POST (upsert) single attendance record
+app.post('/api/attendance', authenticateToken, async (req, res) => {
+  const { studentId, date, status } = req.body;
+  try {
+    await pool.execute(
+      `INSERT INTO attendance (student_id, date, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = ?`,
+      [studentId, date, status, status]
+    );
+    res.json({ message: 'Attendance saved successfully' });
+  } catch (err) {
+    console.error('Error saving attendance:', err);
+    res.status(500).json({ error: 'Failed to save attendance' });
+  }
+});
+
+// POST batch attendance
+app.post('/api/attendance/batch', authenticateToken, async (req, res) => {
+  const { records } = req.body; // [{ studentId, date, status }, ...]
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const stmt = `INSERT INTO attendance (student_id, date, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = ?`;
+    for (const rec of records) {
+      const { studentId, date, status } = rec;
+      await conn.execute(stmt, [studentId, date, status, status]);
+    }
+    await conn.commit();
+    res.json({ message: 'Batch attendance saved successfully' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error saving batch attendance:', err);
+    res.status(500).json({ error: 'Failed to save batch attendance' });
+  } finally {
+    conn.release();
+  }
+});
+
+// ----------------- Marks Endpoints -----------------
 // GET all marks
 app.get('/api/marks', authenticateToken, async (req, res) => {
   try {
@@ -218,7 +262,7 @@ app.get('/api/marks/:studentId', authenticateToken, async (req, res) => {
   const studentId = req.params.studentId;
   try {
     const [marks] = await pool.execute('SELECT * FROM marks WHERE student_id = ?', [studentId]);
-    res.json(marks[0] || {});
+    res.json(marks.length > 0 ? marks[0] : {});
   } catch (err) {
     console.error('Error fetching student marks:', err);
     res.status(500).json({ error: 'Failed to fetch student marks' });
@@ -227,54 +271,28 @@ app.get('/api/marks/:studentId', authenticateToken, async (req, res) => {
 
 // POST create/update marks
 app.post('/api/marks', authenticateToken, async (req, res) => {
-  const marksData = req.body;
-  
+  const m = req.body;
   try {
-    // Check if marks exist for this student
-    const [existing] = await pool.execute('SELECT * FROM marks WHERE student_id = ?', [marksData.student_id]);
-    
+    const [existing] = await pool.execute('SELECT * FROM marks WHERE student_id = ?', [m.student_id]);
     if (existing.length > 0) {
-      // Update existing marks
       await pool.execute(
-        'UPDATE marks SET quiz1=?, quiz2=?, quiz3=?, midExam=?, finalExam=?, assignment1=?, assignment2=? WHERE student_id=?',
-        [
-          marksData.quiz1 || null,
-          marksData.quiz2 || null,
-          marksData.quiz3 || null,
-          marksData.midExam || null,
-          marksData.finalExam || null,
-          marksData.assignment1 || null,
-          marksData.assignment2 || null,
-          marksData.student_id
-        ]
+        `UPDATE marks SET quiz1=?, quiz2=?, quiz3=?, midExam=?, finalExam=?, assignment1=?, assignment2=? WHERE student_id=?`,
+        [m.quiz1||null, m.quiz2||null, m.quiz3||null, m.midExam||null, m.finalExam||null, m.assignment1||null, m.assignment2||null, m.student_id]
       );
     } else {
-      // Insert new marks
       await pool.execute(
-        'INSERT INTO marks (student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          marksData.student_id,
-          marksData.quiz1 || null,
-          marksData.quiz2 || null,
-          marksData.quiz3 || null,
-          marksData.midExam || null,
-          marksData.finalExam || null,
-          marksData.assignment1 || null,
-          marksData.assignment2 || null
-        ]
+        `INSERT INTO marks (student_id, quiz1, quiz2, quiz3, midExam, finalExam, assignment1, assignment2) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [m.student_id, m.quiz1||null, m.quiz2||null, m.quiz3||null, m.midExam||null, m.finalExam||null, m.assignment1||null, m.assignment2||null]
       );
     }
-    
     res.json({ message: 'Marks saved successfully' });
   } catch (err) {
     console.error('Error saving marks:', err);
-    res.status(500).json({ 
-      error: 'Failed to save marks', 
-      details: err.message 
-    });
+    res.status(500).json({ error: 'Failed to save marks', details: err.message });
   }
 });
 
+// ----------------- Start Server -----------------
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });

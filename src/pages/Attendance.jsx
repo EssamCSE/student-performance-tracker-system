@@ -1,208 +1,201 @@
-import React, { useState, useMemo } from 'react'
-import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AgGridReact } from 'ag-grid-react'
-import 'ag-grid-community/styles/ag-grid.css'
-import 'ag-grid-community/styles/ag-theme-quartz.css'
-
-ModuleRegistry.registerModules([AllCommunityModule])
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table'
+import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
+import { getStudents } from '@/api/students'
+import { getAttendanceByMonth, saveAttendance } from '@/api/attendance'
 
 export default function Attendance() {
-  const [month, setMonth] = useState('2024-01')
-  const [threshold] = useState(75)
-  const [students, setStudents] = useState([
-    {
-      id: 'STU001',
-      name: 'Alice Johnson',
-      attendance: {
-        day1: true,
-        day2: true,
-        day3: false,
-        day4: true,
-        day5: true,
-        day6: true,
-        day7: false,
-        day8: true,
-        day9: true,
-        day10: true
-      },
-      percentage: 80
-    },
-    {
-      id: 'STU002',
-      name: 'Bob Smith',
-      attendance: {
-        day1: false,
-        day2: true,
-        day3: true,
-        day4: false,
-        day5: true,
-        day6: false,
-        day7: true,
-        day8: true,
-        day9: false,
-        day10: true
-      },
-      percentage: 60
-    },
-    {
-      id: 'STU003',
-      name: 'Carol White',
-      attendance: {
-        day1: true,
-        day2: true,
-        day3: true,
-        day4: true,
-        day5: true,
-        day6: true,
-        day7: true,
-        day8: true,
-        day9: true,
-        day10: true
-      },
-      percentage: 100
+  // Initial month setup
+  const [month, setMonth] = useState(() => {
+    const saved = localStorage.getItem('attendanceMonth')
+    if (saved) return saved
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+  useEffect(() => {
+    localStorage.setItem('attendanceMonth', month)
+  }, [month])
+
+  const threshold = 75
+  const [students, setStudents] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Fetch students + attendance from DB
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const studentsData = await getStudents()
+      const attendanceData = await getAttendanceByMonth(month)
+
+      if (!Array.isArray(studentsData) || !Array.isArray(attendanceData)) {
+        throw new Error('Invalid API response')
+      }
+
+      const [yearStr, monthStr] = month.split('-')
+      const yearNum = parseInt(yearStr, 10)
+      const monthNum = parseInt(monthStr, 10)
+      const daysCount = new Date(yearNum, monthNum, 0).getDate()
+
+      const merged = studentsData.map((student) => {
+        const records = attendanceData.filter((rec) => rec.student_id === student.id)
+        const attendance = {}
+        let presentCount = 0
+
+        // Initialize all days
+        for (let d = 1; d <= daysCount; d++) {
+          attendance[`day${d}`] = false
+        }
+
+        // Map actual records using Date parsing
+        records.forEach((rec) => {
+          // Ensure we handle both string and Date objects
+          const recDate = rec.date instanceof Date ? rec.date : new Date(rec.date)
+          const day = recDate.getDate()
+          if (day >= 1 && day <= daysCount) {
+            const isPresent = rec.status === 1
+            attendance[`day${day}`] = isPresent
+            if (isPresent) presentCount++
+          }
+        })
+
+        const percentage = Math.round((presentCount / daysCount) * 100)
+        return { id: student.id, name: student.name, attendance, percentage }
+      })
+
+      setStudents(merged)
+    } catch (err) {
+      console.error(err)
+      setError(err.message || 'Failed to fetch attendance')
+    } finally {
+      setLoading(false)
     }
-  ])
+  }, [month])
 
-  const columnDefs = useMemo(() => {
-    const baseColumns = [
-      {
-        field: 'id',
-        headerName: 'ID',
-        width: 100,
-        cellStyle: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingTop: '12px'
-        },
-        headerClass: 'text-center'
-      },
-      {
-        field: 'name',
-        headerName: 'Name',
-        width: 200,
-        cellStyle: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingTop: '12px'
-        },
-        headerClass: 'text-center'
-      }
-    ]
+  // Load data on mount & month change
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
-    const [year, monthNum] = month.split('-')
-    const daysInMonth = new Date(year, monthNum, 0).getDate()
+  // Toggle checkbox locally
+  const handleCheckboxChange = (studentId, dayKey, checked) => {
+    setStudents((prev) =>
+      prev.map((stu) => {
+        if (stu.id !== studentId) return stu
+        const newAtt = { ...stu.attendance, [dayKey]: checked }
+        const present = Object.values(newAtt).filter(Boolean).length
+        const pct = Math.round((present / Object.keys(newAtt).length) * 100)
+        return { ...stu, attendance: newAtt, percentage: pct }
+      })
+    )
+  }
 
-    const dayColumns = Array.from({ length: daysInMonth }, (_, i) => ({
-      field: `day${i + 1}`,
-      headerName: `${i + 1}`,
-      width: 60,
-      cellRenderer: (params) => {
-        const dayKey = `day${i + 1}`
-        const present = params.data.attendance[dayKey]
-        const totalDays = daysInMonth
+  // Save changes to DB then refresh
+  const handleSave = async () => {
+    setLoading(true)
+    try {
+      const [yearStr, monthStr] = month.split('-')
+      const daysCount = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate()
 
-        return (
-          <div className="flex items-center justify-center h-full pt-2">
-            <input
-              type="checkbox"
-              checked={present}
-              onChange={(e) => {
-                const checked = e.target.checked
-                setStudents((prev) =>
-                  prev.map((student) => {
-                    if (student.id !== params.data.id) return student
-
-                    const attendance = {
-                      ...student.attendance,
-                      [dayKey]: checked
-                    }
-                    const presentCount = Object.values(attendance).filter(
-                      (v) => v
-                    ).length
-                    const percentage = Math.round(
-                      (presentCount / totalDays) * 100
-                    )
-
-                    return { ...student, attendance, percentage }
-                  })
-                )
-              }}
-              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-          </div>
-        )
-      }
-    }))
-
-    return [
-      ...baseColumns,
-      ...dayColumns,
-      {
-        field: 'percentage',
-        headerName: '%',
-        width: 80,
-        cellClass: (params) => {
-          if (params.value < threshold) return 'text-red-500 bg-red-50 pt-2 text-center'
-          if (params.value < 85) return 'text-yellow-500 bg-yellow-50 pt-2 text-center'
-          return 'text-green-500 bg-green-50 pt-2 text-center'
-        }
-      },
-      {
-        field: 'status',
-        headerName: 'Status',
-        width: 100,
-        valueGetter: (params) => {
-          if (params.data.percentage < threshold) return 'At Risk'
-          if (params.data.percentage < 85) return 'Warning'
-          return 'Good'
-        },
-        cellClass: (params) => {
-          if (params.data.percentage < threshold) return 'text-red-500 pt-2 text-center '
-          if (params.data.percentage < 85) return 'text-yellow-500 pt-2 text-center'
-          return 'text-green-500 pt-2 text-center'
+      for (const stu of students) {
+        for (let d = 1; d <= daysCount; d++) {
+          const date = `${yearStr}-${monthStr.padStart(2, '0')}-${String(d).padStart(2, '0')}`
+          await saveAttendance(stu.id, date, stu.attendance[`day${d}`])
         }
       }
-    ]
-  }, [month, threshold])
+
+      toast.success('Attendance saved to database')
+      await fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Save failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter students
+  const filtered = students.filter(
+    (s) => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || String(s.id).includes(searchTerm)
+  )
+
+  // Table headers count
+  const [yStr, mStr] = month.split('-')
+  const totalDays = new Date(parseInt(yStr, 10), parseInt(mStr, 10), 0).getDate()
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-center" />
       <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold">Attendance</h2>
-        <div className="flex gap-4">
+        <Input
+          placeholder="Search…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <div className="flex gap-2">
           <Input
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="w-40"
           />
-          <Button>Save Changes</Button>
+          <Button onClick={handleSave} disabled={loading}>
+            {loading ? 'Saving…' : 'Save Changes'}
+          </Button>
         </div>
       </div>
 
-      <div
-        className="ag-theme-quartz rounded-lg border bg-background text-foreground shadow-sm font-sans text-sm"
-        style={{ height: '600px', width: '100%' }}
-      >
-        <AgGridReact
-          rowData={students}
-          columnDefs={columnDefs}
-          domLayout="autoHeight"
-          headerHeight={48}
-          rowHeight={48}
-          suppressCellFocus={true}
-          cellStyle={{ display: 'flex', alignItems: 'center' }}
-          defaultColDef={{
-            sortable: true,
-            resizable: true,
-            filter: true,
-            menuTabs: ['filterMenuTab']
-          }}
-        />
+      {error && <div className="text-red-600">{error}</div>}
+
+      <div className="overflow-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Name</TableHead>
+              {Array.from({ length: totalDays }, (_, i) => (
+                <TableHead key={i}>{i + 1}</TableHead>
+              ))}
+              <TableHead>%</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((stu) => (
+              <TableRow key={stu.id}>
+                <TableCell>{stu.id}</TableCell>
+                <TableCell>{stu.name}</TableCell>
+                {Array.from({ length: totalDays }, (_, i) => {
+                  const key = `day${i + 1}`
+                  return (
+                    <TableCell key={i}>
+                      <input
+                        type="checkbox"
+                        checked={stu.attendance[key]}
+                        onChange={(e) => handleCheckboxChange(stu.id, key, e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </TableCell>
+                  )
+                })}
+                <TableCell className={`pt-2 text-center ${stu.percentage < threshold ? 'text-red-500' : stu.percentage < 85 ? 'text-yellow-500' : 'text-green-500'}`}>{stu.percentage}%</TableCell>
+                <TableCell className={`pt-2 text-center ${stu.percentage < threshold ? 'text-red-500' : stu.percentage < 85 ? 'text-yellow-500' : 'text-green-500'}`}>{stu.percentage < threshold ? 'At Risk' : stu.percentage < 85 ? 'Warning' : 'Good'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
