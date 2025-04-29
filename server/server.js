@@ -99,6 +99,107 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Middleware to verify JWT token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid token.' });
+  }
+};
+
+// GET all students
+app.get('/api/students', authenticateToken, async (req, res) => {
+  try {
+    const [students] = await pool.execute('SELECT * FROM students');
+    res.json(students);
+  } catch (err) {
+    console.error('Error fetching students:', err);
+    res.status(500).json({ error: 'Failed to fetch students' });
+  }
+});
+
+// POST new student
+app.post('/api/students', authenticateToken, async (req, res) => {
+  const { id, name, program, year, email, phone } = req.body;
+
+  // Validate required fields
+  if (!id || !name || !program || !year || !email || !phone) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    // Check if student ID already exists
+    const [existingStudent] = await pool.execute('SELECT id FROM students WHERE id = ?', [id]);
+    if (existingStudent.length > 0) {
+      return res.status(400).json({ error: 'Student ID already exists' });
+    }
+
+    // Check if email already exists
+    const [existingEmail] = await pool.execute('SELECT email FROM students WHERE email = ?', [email]);
+    if (existingEmail.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    // Convert year to integer
+    const yearInt = parseInt(year, 10);
+    if (isNaN(yearInt)) {
+      return res.status(400).json({ error: 'Year must be a valid number' });
+    }
+
+    const [result] = await pool.execute(
+      'INSERT INTO students (id, name, program, year, email, phone) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, name, program, yearInt, email, phone]
+    );
+    res.status(201).json({ message: 'Student added successfully', id: result.insertId });
+  } catch (err) {
+    console.error('Error adding student:', err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'Duplicate entry. Please check student ID and email.' });
+    } else {
+      res.status(500).json({ error: 'Failed to add student. Please try again.' });
+    }
+
+  }
+});
+
+// PUT update student
+app.put('/api/students/:id', authenticateToken, async (req, res) => {
+  const studentId = req.params.id;
+  const { name, program, year, email, phone } = req.body;
+  try {
+    await pool.execute(
+      'UPDATE students SET name = ?, program = ?, year = ?, email = ?, phone = ? WHERE id = ?',
+      [name, program, year, email, phone, studentId]
+    );
+    res.json({ message: 'Student updated successfully' });
+  } catch (err) {
+    console.error('Error updating student:', err);
+    res.status(500).json({ error: 'Failed to update student' });
+  }
+});
+
+// DELETE student
+app.delete('/api/students/:id', authenticateToken, async (req, res) => {
+  const studentId = req.params.id;
+  try {
+    await pool.execute('DELETE FROM students WHERE id = ?', [studentId]);
+    res.json({ message: 'Student deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting student:', err);
+    res.status(500).json({ error: 'Failed to delete student' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
