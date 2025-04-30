@@ -1,4 +1,4 @@
-# 📚 Student Management System (SMS) 🏫
+# 📚 Student Preformance Tracker System (SPTS) 🏫
 
 ✨ A modern web application for managing student records, attendance, and marks with a clean UI and RESTful API.
 
